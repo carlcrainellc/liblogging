@@ -27,14 +27,13 @@ namespace {
     // Custom log formatting flag that prints the elapsed time since startup
     class startup_elapsed_flag : public spdlog::custom_flag_formatter {
       private:
-        static constexpr fmt::format_string<
-                std::chrono::hours::rep,
-                std::chrono::minutes::rep,
-                std::chrono::seconds::rep,
-                std::chrono::milliseconds::rep>
-                format_hours{"+{0:d}h{1:02d}m{2:02d}.{3:03d}s"},  // >= 1h
-                format_minutes{"+{1:d}m{2:02d}.{3:03d}s"},        // >= 1min
-                format_seconds{"+{2:d}.{3:03d}s"};                // < 1min
+        // MinGW + fmt v12: format_string is not a literal type; use arrays + runtime.
+        static constexpr const char format_hours[] =
+                "+{0:d}h{1:02d}m{2:02d}.{3:03d}s";  // >= 1h
+        static constexpr const char format_minutes[] =
+                "+{1:d}m{2:02d}.{3:03d}s";        // >= 1min
+        static constexpr const char format_seconds[] =
+                "+{2:d}.{3:03d}s";                // < 1min
 
       public:
         void format(const spdlog::details::log_msg&, const std::tm&, spdlog::memory_buf_t& dest)
@@ -43,9 +42,10 @@ namespace {
             auto elapsed = std::chrono::steady_clock::now() - started_at;
 
             dest.append(fmt::format(
-                    elapsed >= 1h     ? format_hours
-                    : elapsed >= 1min ? format_minutes
-                                      : format_seconds,
+                    fmt::runtime(
+                            elapsed >= 1h     ? format_hours
+                            : elapsed >= 1min ? format_minutes
+                                              : format_seconds),
                     std::chrono::duration_cast<std::chrono::hours>(elapsed).count(),
                     (std::chrono::duration_cast<std::chrono::minutes>(elapsed) % 1h).count(),
                     (std::chrono::duration_cast<std::chrono::seconds>(elapsed) % 1min).count(),
